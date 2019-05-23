@@ -1,6 +1,6 @@
 import logging
 import math
-import ConfigParser
+import configparser
 import numpy as np
 
 from src.utils.utils import ceil_a_by_b, log2, lookup_pandas_dataframe
@@ -9,6 +9,11 @@ from src.simulator.loop_stack import LoopStack
 from src.optimizer.optimizer import optimize_for_order, get_stats_fast
 from src.simulator.accelerator import Accelerator
 from src.simulator.energy import EnergyTuple
+
+import future        # pip install future
+import builtins      # pip install future
+import past          # pip install future
+import six           # pip install six
 
 from sram.cacti_sweep import CactiSweep
 import os
@@ -28,7 +33,7 @@ class Simulator(object):
 
         self.config_file = config_file
 
-        self.config = ConfigParser.ConfigParser()
+        self.config = configparser.ConfigParser()
         self.config.read(config_file)
 
         systolic_dim = [self.config.getint('accelerator', 'a'),
@@ -179,31 +184,36 @@ class Simulator(object):
         self.logger.debug('\tWrite Energy                : {0:>8.4f} pJ/bit'.format(obuf_write_energy * 1.e3))
         ##################################################
         # Get stats for systolic array
-        core_csv = os.path.join('./results', 'systolic_array_synth.csv')
-        core_synth_data = pandas.read_csv(core_csv)
+        #core_csv = os.path.join('./results', 'systolic_array_synth.csv')
+        #core_synth_data = pandas.read_csv(core_csv)
 
         lookup_dict = {}
         lookup_dict['Max Precision (bits)'] = pmax
         lookup_dict['Min Precision (bits)'] = pmin
         lookup_dict['N'] = N
         lookup_dict['M'] = M
-        core_data = lookup_pandas_dataframe(core_synth_data, lookup_dict)
-        if len(core_data) == 0:
-            lookup_dict['N'] = 4
-            lookup_dict['M'] = 4
-            core_data = lookup_pandas_dataframe(core_synth_data, lookup_dict)
-            assert len(core_data) == 1
-            core_area = float(core_data['Area (um^2)']) * 1.e-6 * (N * M) / 16.
-            core_dyn_power = float(core_data['Dynamic Power (nW)']) * (N * M) / 16.
-            core_dyn_energy = core_dyn_power / float(core_data['Frequency'])
-            core_leak_power = float(core_data['Leakage Power (nW)']) * (N * M) / 16.
-            core_leak_energy = core_leak_power / float(core_data['Frequency'])
-        else:
-            core_area = float(core_data['Area (um^2)']) * 1.e-6
-            core_dyn_power = float(core_data['Dynamic Power (nW)'])
-            core_dyn_energy = core_dyn_power / float(core_data['Frequency'])
-            core_leak_power = float(core_data['Leakage Power (nW)'])
-            core_leak_energy = core_leak_power / float(core_data['Frequency'])
+        #core_data = lookup_pandas_dataframe(core_synth_data, lookup_dict)
+       # if len(core_data) == 0:
+       #     lookup_dict['N'] = 4
+       #     lookup_dict['M'] = 4
+       #     core_data = lookup_pandas_dataframe(core_synth_data, lookup_dict)
+       #     assert len(core_data) == 1
+       #     core_area = float(core_data['Area (um^2)']) * 1.e-6 * (N * M) / 16.
+       #     core_dyn_power = float(core_data['Dynamic Power (nW)']) * (N * M) / 16.
+       #     core_dyn_energy = core_dyn_power / float(core_data['Frequency'])
+       #     core_leak_power = float(core_data['Leakage Power (nW)']) * (N * M) / 16.
+       #     core_leak_energy = core_leak_power / float(core_data['Frequency'])
+       # else:
+       #     core_area = float(core_data['Area (um^2)']) * 1.e-6
+       #     core_dyn_power = float(core_data['Dynamic Power (nW)'])
+       #     core_dyn_energy = core_dyn_power / float(core_data['Frequency'])
+       #     core_leak_power = float(core_data['Leakage Power (nW)'])
+       #     core_leak_energy = core_leak_power / float(core_data['Frequency'])
+        core_area = 0
+        core_dyn_power = 0
+        core_dyn_energy = 0
+        core_leak_power = 0
+        core_leak_energy = 0
         self.logger.debug('Core :')
         self.logger.debug('\tDimensions              : {0}x{1}-systolic array'.format(N, M))
         self.logger.debug('\tMax-Precision           : {}'.format(pmax))
@@ -300,31 +310,36 @@ class Simulator(object):
         self.logger.debug('\tWrite Energy                : {0:>8.4f} pJ/bit'.format(obuf_write_energy * 1.e3))
         ##################################################
         # Get stats for systolic array
-        core_csv = os.path.join('./results', 'systolic_array_synth.csv')
-        core_synth_data = pandas.read_csv(core_csv)
+        #core_csv = os.path.join('./results', 'systolic_array_synth.csv')
+        #core_synth_data = pandas.read_csv(core_csv)
 
         lookup_dict = {}
         lookup_dict['Max Precision (bits)'] = pmax
         lookup_dict['Min Precision (bits)'] = pmin
         lookup_dict['N'] = N
         lookup_dict['M'] = M
-        core_data = lookup_pandas_dataframe(core_synth_data, lookup_dict)
-        if len(core_data) == 0:
-            lookup_dict['N'] = 4
-            lookup_dict['M'] = 4
-            core_data = lookup_pandas_dataframe(core_synth_data, lookup_dict)
-            assert len(core_data) == 1
-            core_area = float(core_data['Area (um^2)']) * 1.e-6 * (N * M) / 16.
-            core_dyn_power = float(core_data['Dynamic Power (nW)']) * (N * M) / 16.
-            core_dyn_energy = core_dyn_power / float(core_data['Frequency'])
-            core_leak_power = float(core_data['Leakage Power (nW)']) * (N * M) / 16.
-            core_leak_energy = core_leak_power / float(core_data['Frequency'])
-        else:
-            core_area = float(core_data['Area (um^2)']) * 1.e-6
-            core_dyn_power = float(core_data['Dynamic Power (nW)'])
-            core_dyn_energy = core_dyn_power / float(core_data['Frequency'])
-            core_leak_power = float(core_data['Leakage Power (nW)'])
-            core_leak_energy = core_leak_power / float(core_data['Frequency'])
+        #core_data = lookup_pandas_dataframe(core_synth_data, lookup_dict)
+        #if len(core_data) == 0:
+        #    lookup_dict['N'] = 4
+        #    lookup_dict['M'] = 4
+        #    core_data = lookup_pandas_dataframe(core_synth_data, lookup_dict)
+        #    assert len(core_data) == 1
+        #    core_area = float(core_data['Area (um^2)']) * 1.e-6 * (N * M) / 16.
+        #    core_dyn_power = float(core_data['Dynamic Power (nW)']) * (N * M) / 16.
+        #    core_dyn_energy = core_dyn_power / float(core_data['Frequency'])
+        #    core_leak_power = float(core_data['Leakage Power (nW)']) * (N * M) / 16.
+        #    core_leak_energy = core_leak_power / float(core_data['Frequency'])
+        #else:
+        #    core_area = float(core_data['Area (um^2)']) * 1.e-6
+        #    core_dyn_power = float(core_data['Dynamic Power (nW)'])
+        #    core_dyn_energy = core_dyn_power / float(core_data['Frequency'])
+        #    core_leak_power = float(core_data['Leakage Power (nW)'])
+        #    core_leak_energy = core_leak_power / float(core_data['Frequency'])
+        core_area = 0 
+        core_dyn_power = 0 
+        core_dyn_energy = 0 
+        core_leak_power = 0 
+        core_leak_energy = 0 
         self.logger.debug('Core :')
         self.logger.debug('\tDimensions              : {0}x{1}-systolic array'.format(N, M))
         self.logger.debug('\tMax-Precision           : {}'.format(pmax))
