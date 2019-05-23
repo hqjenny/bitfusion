@@ -28,7 +28,7 @@ def fc(tensor_in, output_channels=1024,
         with get_default_graph().name_scope(act):
             act = _fc
     else:
-        raise ValueError, 'Unknown activation type {}'.format(act)
+        raise ValueError('Unknown activation type {}'.format(act))
 
     return act
 
@@ -56,19 +56,20 @@ def conv(tensor_in, filters=32, stride=None, kernel_size=3, pad='SAME',
         with get_default_graph().name_scope(act):
             act = _conv
     else:
-        raise ValueError, 'Unknown activation type {}'.format(act)
+        raise ValueError('Unknown activation type {}'.format(act))
 
     return act
 
 benchlist = [\
-             'AlexNet', \
-             'SVHN', \
-             'CIFAR10', \
-             'LeNet-5', \
-             'VGG-7', \
-             'RESNET-18', \
-             'RNN', \
-             'LSTM' \
+#             'AlexNet', \
+#             'SVHN', \
+#             'CIFAR10', \
+#             'LeNet-5', \
+#             'VGG-7', \
+#             'RESNET-18', \
+             'RESNET-50' \
+#             'RNN', \
+#             'LSTM' \
             ]
 
 def get_bench_nn(bench_name, WRPN=False):
@@ -85,6 +86,8 @@ def get_bench_nn(bench_name, WRPN=False):
         return get_lenet_5_twn()
     elif bench_name == 'VGG-7':
         return get_vgg_7_twn()
+    elif bench_name == 'RESNET-50':
+        return get_resnet_50()
     elif bench_name == 'RESNET-18':
         if WRPN:
             return get_resnet_18_wrpn()
@@ -114,7 +117,7 @@ def write_to_csv(csv_name, fields, stats, graph, csv_path='./'):
 
 def get_bench_numbers(graph, sim_obj, batch_size=1):
     stats = {}
-    for opname, op in graph.op_registry.iteritems():
+    for opname, op in graph.op_registry.items():
         out = sim_obj.get_cycles(op, batch_size)
         if out is not None:
             s, l = out
@@ -712,6 +715,156 @@ def get_resnet_18_wrpn():
                     conv5_b = conv(conv5_a, filters=1024, kernel_size=3, pad='SAME',
                             c_dtype=FQDtype.FXP4, w_dtype=FQDtype.FXP4)
     return g
+
+def get_resnet_50(ty=FQDtype.FXP8):
+    '''
+    ResNet-18
+
+    Note that this isn't ResNet-18B
+    '''
+
+    g = Graph('ResNet-18-TWN', dataset='ImageNet', log_level=logging.INFO)
+    batch_size = 16
+
+    with g.as_default():
+        with g.name_scope('inputs'):
+            i = get_tensor(shape=(batch_size,224,224,3), name='data', dtype=FQDtype.FXP8, trainable=False)
+
+        with g.name_scope('conv1_a'):
+            conv1_a = conv(i, filters=64, kernel_size=7, pad='SAME', stride=(1,2,2,1),
+                    c_dtype=ty, w_dtype=ty)
+        with g.name_scope('pool1_a'):
+            pool1_a = maxPool(conv1_a, pooling_kernel=(1,2,2,1), stride=(1,2,2,1), pad='VALID')
+
+        with g.name_scope('module2'):
+            i = 1
+            with g.name_scope('conv2_{}_a'.format(i)):
+                conv2_a = conv(pool1_a, filters=64, kernel_size=1, pad='SAME',
+                            c_dtype=ty, w_dtype=ty)
+            with g.name_scope('conv2_{}_b'.format(i)):
+                conv2_b = conv(conv2_a, filters=64, kernel_size=3, pad='SAME',
+                        c_dtype=ty, w_dtype=ty)
+            with g.name_scope('conv2_{}_c'.format(i)):
+                conv2_c = conv(conv2_b, filters=256, kernel_size=1, pad='SAME',
+                        c_dtype=ty, w_dtype=ty)
+            with g.name_scope('conv2_{}_d'.format(i)):
+                conv2_d = conv(pool1_a, filters=256, kernel_size=1, pad='SAME',
+                            c_dtype=ty, w_dtype=ty)
+            with g.name_scope('add_{}'.format(i)):
+                add2 = add((conv2_c, conv2_d))
+
+            for i in range(2, 4):
+                with g.name_scope('conv2_{}_a'.format(i)):
+                    conv2_a = conv(add2, filters=64, kernel_size=1, pad='SAME',
+                                c_dtype=ty, w_dtype=ty)
+                with g.name_scope('conv2_{}_b'.format(i)):
+                    conv2_b = conv(conv2_a, filters=64, kernel_size=3, pad='SAME',
+                            c_dtype=ty, w_dtype=ty)
+                with g.name_scope('conv2_{}_c'.format(i)):
+                    conv2_c = conv(conv2_b, filters=256, kernel_size=1, pad='SAME',
+                            c_dtype=ty, w_dtype=ty)
+                with g.name_scope('add_{}'.format(i)):
+                    add2 = add((add2, conv2_c))
+
+        with g.name_scope('module3'):
+            i = 1
+            with g.name_scope('conv3_{}_a'.format(i)):
+                conv3_a = conv(add2, filters=128, kernel_size=1, pad='SAME', stride=(1,2,2,1),
+                            c_dtype=ty, w_dtype=ty)
+            with g.name_scope('conv3_{}_b'.format(i)):
+                conv3_b = conv(conv3_a, filters=128, kernel_size=3, pad='SAME',
+                        c_dtype=ty, w_dtype=ty)
+            with g.name_scope('conv3_{}_c'.format(i)):
+                conv3_c = conv(conv3_b, filters=512, kernel_size=1, pad='SAME',
+                        c_dtype=ty, w_dtype=ty)
+            with g.name_scope('conv3_{}_d'.format(i)):
+                conv3_d = conv(add2, filters=512, kernel_size=1, pad='SAME', stride=(1,2,2,1),
+                            c_dtype=ty, w_dtype=ty)
+            with g.name_scope('add_{}'.format(i)):
+                add3 = add((conv3_c, conv3_d))
+
+            for i in range(2, 5):
+                with g.name_scope('conv3_{}_a'.format(i)):
+                    conv3_a = conv(add3, filters=128, kernel_size=1, pad='SAME',
+                                c_dtype=ty, w_dtype=ty)
+                with g.name_scope('conv3_{}_b'.format(i)):
+                    conv3_b = conv(conv3_a, filters=128, kernel_size=3, pad='SAME',
+                            c_dtype=ty, w_dtype=ty)
+                with g.name_scope('conv3_{}_c'.format(i)):
+                    conv3_c = conv(conv3_b, filters=512, kernel_size=1, pad='SAME',
+                            c_dtype=ty, w_dtype=ty)
+                with g.name_scope('add_{}'.format(i)):
+                    add3 = add((add3, conv3_c))
+
+        with g.name_scope('module4'):
+            i = 1
+            with g.name_scope('conv4_{}_a'.format(i)):
+                conv4_a = conv(add3, filters=256, kernel_size=1, pad='SAME', stride=(1,2,2,1),
+                            c_dtype=ty, w_dtype=ty)
+            with g.name_scope('conv4_{}_b'.format(i)):
+                conv4_b = conv(conv4_a, filters=256, kernel_size=3, pad='SAME',
+                        c_dtype=ty, w_dtype=ty)
+            with g.name_scope('conv4_{}_c'.format(i)):
+                conv4_c = conv(conv4_b, filters=1024, kernel_size=1, pad='SAME',
+                        c_dtype=ty, w_dtype=ty)
+            with g.name_scope('conv4_{}_d'.format(i)):
+                conv4_d = conv(add3, filters=1024, kernel_size=1, pad='SAME', stride=(1,2,2,1),
+                            c_dtype=ty, w_dtype=ty)
+            with g.name_scope('add_{}'.format(i)):
+                add4 = add((conv4_c, conv4_d))
+
+            for i in range(2, 7):
+                with g.name_scope('conv4_{}_a'.format(i)):
+                    conv4_a = conv(add4, filters=256, kernel_size=1, pad='SAME',
+                                c_dtype=ty, w_dtype=ty)
+                with g.name_scope('conv4_{}_b'.format(i)):
+                    conv4_b = conv(conv4_a, filters=256, kernel_size=3, pad='SAME',
+                            c_dtype=ty, w_dtype=ty)
+                with g.name_scope('conv4_{}_c'.format(i)):
+                    conv4_c = conv(conv4_b, filters=1024, kernel_size=1, pad='SAME',
+                            c_dtype=ty, w_dtype=ty)
+                with g.name_scope('add_{}'.format(i)):
+                    add4 = add((add4, conv4_c))
+
+        with g.name_scope('module5'):
+            i = 1
+            with g.name_scope('conv5_{}_a'.format(i)):
+                conv5_a = conv(add4, filters=512, kernel_size=1, pad='SAME', stride=(1,2,2,1),
+                            c_dtype=ty, w_dtype=ty)
+            with g.name_scope('conv5_{}_b'.format(i)):
+                conv5_b = conv(conv5_a, filters=512, kernel_size=3, pad='SAME',
+                        c_dtype=ty, w_dtype=ty)
+            with g.name_scope('conv5_{}_c'.format(i)):
+                conv5_c = conv(conv5_b, filters=2048, kernel_size=1, pad='SAME',
+                        c_dtype=ty, w_dtype=ty)
+            with g.name_scope('conv5_{}_d'.format(i)):
+                conv5_d = conv(add4, filters=2048, kernel_size=1, pad='SAME', stride=(1,2,2,1),
+                            c_dtype=ty, w_dtype=ty)
+            with g.name_scope('add_{}'.format(i)):
+                add5 = add((conv5_c, conv5_d))
+
+            for i in range(2, 4):
+                with g.name_scope('conv5_{}_a'.format(i)):
+                    conv5_a = conv(add5, filters=512, kernel_size=1, pad='SAME',
+                                c_dtype=ty, w_dtype=ty)
+                with g.name_scope('conv5_{}_b'.format(i)):
+                    conv5_b = conv(conv5_a, filters=512, kernel_size=3, pad='SAME',
+                            c_dtype=ty, w_dtype=ty)
+                with g.name_scope('conv5_{}_c'.format(i)):
+                    conv5_c = conv(conv5_b, filters=2048, kernel_size=1, pad='SAME',
+                            c_dtype=ty, w_dtype=ty)
+                with g.name_scope('add_{}'.format(i)):
+                    add5 = add((add5, conv5_c))
+
+        with g.name_scope('fc6'):
+            avg_pool = maxPool(add5, pooling_kernel=(1,7,7,1), stride=(1,7,7,1), pad='VALID') # TODO add average
+
+            fc6 = fc(avg_pool, output_channels=1024, w_dtype=FQDtype.Bin,
+                    f_dtype=FQDtype.Bin)
+
+ 
+        return g
+
 
 if __name__ == "__main__":
     # parser object
